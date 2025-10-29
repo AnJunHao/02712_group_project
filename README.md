@@ -22,10 +22,30 @@ cd 02712_group_project
 uv sync
 ```
 
-**Run:**
+**Using the environment:**
+
+- Option 1: Activate the virtual environment:
+
+```bash
+# Windows
+.venv\Scripts\activate
+```
+
+```bash
+# macOS/Linux
+source .venv/bin/activate
+```
+
+- Option 2: Run Jupyter Lab directly:
 
 ```bash
 uv run jupyter lab
 ```
 
-Or use your preferred IDE to open the project folder and use the virtual environment in folder `.venv`.
+- Option 3: Register the kernel for Jupyter:
+
+```bash
+uv run python -m ipykernel install --user --name graphvelo --display-name "Python3.12 (GraphVelo)"
+```
+
+- Option 4: Use your favorite IDE and select the python interpreter from the `.venv` folder.
