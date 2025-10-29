@@ -1,0 +1,15 @@
+[project]
+name = "02712_group_project"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = "==3.12.*"
+dependencies = [
+    "cellrank>=2.0.7",
+    "graphvelo>=0.1.9",
+    "ipykernel>=7.1.0",
+    "ipywidgets>=8.1.7",
+    "scvelo>=0.3.3",
+    "tqdm>=4.67.1",
+    "numpy<2.0.0",
+]
