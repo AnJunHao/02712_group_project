@@ -17,13 +17,15 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 **Clone and install:**
 ```bash
-git clone <repository-url>
-cd model_sim
+git clone https://github.com/AnJunHao/02712_group_project.git
+cd 02712_group_project
 uv sync
 ```
 
 **Run:**
+
 ```bash
-uv run jupyter notebook tutorial_for_scvelo.ipynb
+uv run jupyter lab
 ```
 
+Or use your preferred IDE to open the project folder and use the virtual environment in folder `.venv`.
