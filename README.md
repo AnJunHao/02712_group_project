@@ -36,16 +36,13 @@ uv sync
 source .venv/bin/activate
 ```
 
-- Option 2: Run Jupyter Lab directly:
-
-```bash
-uv run jupyter lab
-```
-
-- Option 3: Register the kernel for Jupyter:
+- Option 2: Run Jupyter Lab:
 
 ```bash
 uv run python -m ipykernel install --user --name graphvelo --display-name "Python3.12 (GraphVelo)"
+uv run jupyter lab
 ```
 
-- Option 4: Use your favorite IDE and select the python interpreter from the `.venv` folder.
+In Jupyter Lab, select the kernel "Python3.12 (GraphVelo)" for your notebooks.
+
+- Option 3: Use your favorite IDE and select the python interpreter from the `.venv` folder.
