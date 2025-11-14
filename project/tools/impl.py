@@ -57,7 +57,7 @@ def recover_dynamics(
 def velocity(
     data: AnnData,
     vkey: str = "velocity",
-    mode: Literal["deterministic", "stochastic", "dynamical"] = "stochastic",
+    mode: Literal["stochastic"] = "stochastic",
     fit_offset: bool = False,
     fit_offset2: bool = False,
     filter_genes: bool = False,

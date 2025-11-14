@@ -2,9 +2,76 @@
 
 This repository contains code and resources for the 02-712 Group Project on GraphVelo.
 
+## Major Tasks
+
+### 1. `project/graphvelo`
+
+**Ziyan**
+
+- `GraphVelo` (class): Main implementation class
+
+- `adj_to_knn()`: Convert adjacency matrix to k-nearest neighbors
+
+**Wen**
+
+- `mack_score()`: Calculate MACK (Mean Average Cosine Kernel) score for evaluation
+
+### 2. `project/preprocessing`
+
+**Claude**
+
+- `filter_and_normalize()`: Filter and normalize scRNA-seq data
+- `neighbors()`: Compute neighborhood graph of observations
+- `moments()`: Compute first and second order moments for velocity estimation
+- `pca()`: Principal component analysis
+
+### 3. `project/tools`
+
+**Luci**
+
+- `recover_dynamics()`: Recover full kinetic dynamics of gene expression
+- `latent_time()`: Compute latent time for each cell
+
+**Xingyu**
+
+- `velocity()`: Estimate RNA velocity using different modes (deterministic, stochastic, dynamical)
+
+---
+
+## Project Structure
+
+```
+02712_group_project/
+├── project/                       # Main package directory
+│   ├── __init__.py
+│   ├── graphvelo/                # GraphVelo implementation
+│   │   ├── __init__.py
+│   │   └── ...
+│   ├── preprocessing/            # Data preprocessing modules
+│   │   ├── __init__.py
+│   │   └── ...
+│   ├── tools/                    # Analysis tools
+│   │   ├── __init__.py
+│   │   └── ...
+│   └── plotting/                 # Visualization functions
+│       ├── __init__.py
+│       └── ...
+├── graphvelo_scv.ipynb           # Main notebook for GraphVelo analysis
+├── test_graphvelo_scv.ipynb      # Testing notebook
+├── tutorial_for_scvelo.ipynb     # scVelo tutorial
+├── pyproject.toml                # Project dependencies and configuration
+├── uv.lock                       # Locked dependency versions
+└── README.md                     # This file
+```
+
+---
+
 ## Installation
 
-**Install uv:**
+This project uses `uv` to manage the python environment and dependencies. See [uv documentation](https://docs.astral.sh/uv/) for more details.
+
+**1. Install uv:**
+
 ```powershell
 # Windows
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
@@ -15,12 +82,17 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-**Clone and install:**
+**2. Clone and install:**
+
 ```bash
 git clone https://github.com/AnJunHao/02712_group_project.git
 cd 02712_group_project
 uv sync
 ```
+
+Done! `uv sync` will create a virtual environment `.venv` with correct python version and all dependencies installed. `uv` uses the `pyproject.toml` file to resolve dependencies.
+
+---
 
 **Using the environment:**
 
