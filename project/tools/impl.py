@@ -5,6 +5,7 @@ from anndata import AnnData
 from typing import Any, Literal
 from numpy.typing import NDArray
 
+
 def recover_dynamics(
     data: AnnData,
     var_names: str | list[str] = "velocity_genes",
@@ -54,10 +55,13 @@ def recover_dynamics(
         **kwargs,
     )
 
+
 def velocity(
     data: AnnData,
     vkey: str = "velocity",
-    mode: Literal["stochastic"] = "stochastic",
+    mode: Literal[
+        "dynamical", "stochastic"
+    ] = "stochastic",  # included dynamical mode because the notebook is using it
     fit_offset: bool = False,
     fit_offset2: bool = False,
     filter_genes: bool = False,
@@ -98,6 +102,7 @@ def velocity(
         copy=copy,
         **kwargs,
     )
+
 
 def latent_time(
     data: AnnData,

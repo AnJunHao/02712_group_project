@@ -8,8 +8,7 @@ from graphvelo.utils import mack_score as gv_mack_score
 
 
 def adj_to_knn(
-    adj: NDArray[np.float64],
-    n_neighbors: int = 30
+    adj: NDArray[np.float64], n_neighbors: int = 30
 ) -> tuple[NDArray[np.int_], NDArray[np.float64]]:
     return gv_adj_to_knn(adj, n_neighbors)
 
@@ -42,4 +41,3 @@ def mack_score(
         add_prefix,
         return_score,
     )
-

@@ -6,7 +6,6 @@ from graphvelo.graph_velocity import GraphVelo as GraphVeloBase
 
 
 class GraphVelo(GraphVeloBase):
-
     def __init__(
         self,
         adata: AnnData,
@@ -19,7 +18,6 @@ class GraphVelo(GraphVeloBase):
         n_pcs: int = 30,
         mo: bool = False,
     ) -> None:
-
         super().__init__(
             adata=adata,
             xkey=xkey,
@@ -41,7 +39,6 @@ class GraphVelo(GraphVeloBase):
         transition_matrix: NDArray[np.float64] | None = None,
         softmax_adjusted: bool = False,
     ) -> None:
-
         super().train(
             a=a,
             b=b,

@@ -7,6 +7,7 @@ from typing import Any, Literal
 import numpy as np
 from numpy.typing import NDArray
 
+
 def filter_and_normalize(
     data: AnnData,
     min_counts: int | None = None,
@@ -42,6 +43,7 @@ def filter_and_normalize(
         **kwargs,
     )
 
+
 def neighbors(
     adata: AnnData,
     n_neighbors: int = 15,
@@ -72,6 +74,7 @@ def neighbors(
         copy=copy,
     )
 
+
 def moments(
     data: AnnData,
     n_neighbors: int = 30,
@@ -87,11 +90,12 @@ def moments(
         n_neighbors=n_neighbors,
         n_pcs=n_pcs,
         mode=mode,
-        method=method, # type: ignore
+        method=method,  # type: ignore
         use_rep=use_rep,
         use_highly_variable=use_highly_variable,
         copy=copy,
     )
+
 
 def pca(
     data: AnnData | NDArray | Any,
@@ -99,7 +103,8 @@ def pca(
     *,
     layer: str | None = None,
     zero_center: bool = True,
-    svd_solver: Literal["arpack", "randomized", "auto", "covariance_eigh", "tsqr"] | None = None,
+    svd_solver: Literal["arpack", "randomized", "auto", "covariance_eigh", "tsqr"]
+    | None = None,
     chunked: bool = False,
     chunk_size: int | None = None,
     random_state: int = 0,
