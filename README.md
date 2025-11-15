@@ -47,3 +47,4 @@ In Jupyter Lab, select the kernel "Python3.12 (GraphVelo)" for your notebooks.
 
 - Option 3: Use your favorite IDE and select the python interpreter from the `.venv` folder.
 Hachimi
+Manbo
