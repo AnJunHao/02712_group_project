@@ -1,9 +1,18 @@
-from scvelo.tools import recover_dynamics as scv_recover_dynamics
-from scvelo.tools import velocity as scv_velocity
-from scvelo.tools import latent_time as scv_latent_time
-from anndata import AnnData
+from __future__ import annotations
+
 from typing import Any, Literal
+
+import numpy as np
+from anndata import AnnData
 from numpy.typing import NDArray
+
+from project.tools.dynamical import (
+    compute_dynamical_velocity,
+    extract_dynamical_parameters,
+    select_velocity_genes,
+)
+from project.tools.latent import infer_latent_time
+from scvelo.tools import recover_dynamics as scv_recover_dynamics
 
 
 def recover_dynamics(
@@ -59,9 +68,7 @@ def recover_dynamics(
 def velocity(
     data: AnnData,
     vkey: str = "velocity",
-    mode: Literal[
-        "dynamical", "stochastic"
-    ] = "stochastic",  # included dynamical mode because the notebook is using it
+    mode: Literal["dynamical", "stochastic"] = "dynamical",
     fit_offset: bool = False,
     fit_offset2: bool = False,
     filter_genes: bool = False,
@@ -80,28 +87,62 @@ def velocity(
     copy: bool = False,
     **kwargs: Any,
 ) -> AnnData | None:
-    return scv_velocity(
-        data=data,
-        vkey=vkey,
-        mode=mode,
-        fit_offset=fit_offset,
-        fit_offset2=fit_offset2,
-        filter_genes=filter_genes,
-        groups=groups,
-        groupby=groupby,
-        groups_for_fit=groups_for_fit,
-        constrain_ratio=constrain_ratio,
-        use_raw=use_raw,
-        use_latent_time=use_latent_time,
-        perc=perc,
-        min_r2=min_r2,
-        min_likelihood=min_likelihood,
-        r2_adjusted=r2_adjusted,
-        use_highly_variable=use_highly_variable,
-        diff_kinetics=diff_kinetics,
-        copy=copy,
-        **kwargs,
+    """
+    Compute RNA velocities using the dynamical model.
+
+    This reimplementation focuses solely on the dynamical mode and follows the
+    derivation used in scVelo: kinetic parameters must be present (produced by
+    ``recover_dynamics``) and we analytically evaluate the ODE solution for each
+    cell/gene pair to obtain `ds/dt` and `du/dt`.
+    """
+
+    if mode != "dynamical":
+        raise NotImplementedError(
+            "Only the dynamical model is supported in this implementation."
+        )
+    if fit_offset or fit_offset2 or groups or groupby or groups_for_fit:
+        raise NotImplementedError(
+            "Group-specific or offset fits are not implemented in this simplified "
+            "dynamical velocity."
+        )
+
+    adata = data.copy() if copy else data
+
+    if "fit_t" not in adata.layers:
+        raise ValueError("recover_dynamics must be executed before velocity().")
+
+    gene_mask = select_velocity_genes(
+        adata, min_likelihood=min_likelihood, min_r2=min_r2
     )
+    if not np.any(gene_mask):
+        raise ValueError("No genes passed the velocity filtering thresholds.")
+
+    params = extract_dynamical_parameters(adata, gene_mask)
+    latent = np.asarray(adata.layers["fit_t"][:, gene_mask], dtype=np.float64)
+    v_spliced, v_unspliced = compute_dynamical_velocity(adata, params, latent)
+
+    # Fill result layers with NaNs and write subset
+    velocity_layer = np.full(adata.shape, np.nan, dtype=np.float32)
+    velocity_layer[:, gene_mask] = v_spliced.astype(np.float32)
+    adata.layers[vkey] = velocity_layer
+
+    velocity_u = np.full(adata.shape, np.nan, dtype=np.float32)
+    velocity_u[:, gene_mask] = v_unspliced.astype(np.float32)
+    adata.layers[f"{vkey}_u"] = velocity_u
+
+    adata.var[f"{vkey}_genes"] = gene_mask
+    adata.uns[f"{vkey}_params"] = {
+        "mode": mode,
+        "fit_offset": fit_offset,
+        "fit_offset2": fit_offset2,
+        "min_r2": min_r2,
+        "min_likelihood": min_likelihood,
+    }
+
+    if filter_genes and np.sum(gene_mask) > 0:
+        adata._inplace_subset_var(gene_mask)
+
+    return adata if copy else None
 
 
 def latent_time(
@@ -116,15 +157,36 @@ def latent_time(
     t_max: float | None = None,
     copy: bool = False,
 ) -> AnnData | None:
-    return scv_latent_time(
-        data=data,
-        vkey=vkey,
-        min_likelihood=min_likelihood,
+    """
+    Compute a gene-shared latent time using recovered dynamics.
+
+    The estimator aggregates gene-specific latent times (``fit_t``) using
+    likelihood weighting and enforces smoothness by propagating times across
+    the neighborhood connectivities graph.
+    """
+
+    if min_corr_diffusion is not None:
+        raise NotImplementedError(
+            "min_corr_diffusion is not supported in the lightweight latent time."
+        )
+
+    adata = data.copy() if copy else data
+
+    gene_mask = select_velocity_genes(
+        adata, min_likelihood=min_likelihood, min_r2=None
+    )
+    latent = infer_latent_time(
+        adata,
+        gene_mask,
         min_confidence=min_confidence,
-        min_corr_diffusion=min_corr_diffusion,
+        min_likelihood=min_likelihood,
         weight_diffusion=weight_diffusion,
         root_key=root_key,
         end_key=end_key,
         t_max=t_max,
-        copy=copy,
     )
+
+    adata.var[f"{vkey}_genes"] = gene_mask
+    adata.obs["latent_time"] = latent.astype(np.float32)
+
+    return adata if copy else None
