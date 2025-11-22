@@ -9,10 +9,72 @@ from graphvelo.utils import adj_to_knn as gv_adj_to_knn
 from graphvelo.utils import mack_score as gv_mack_score
 
 
-def adj_to_knn(
-    adj: NDArray[np.float64], n_neighbors: int = 30
-) -> tuple[NDArray[np.int_], NDArray[np.float64]]:
-    return gv_adj_to_knn(adj, n_neighbors)
+### This is Helper function to process a single row.
+def get_row_knn(i: int, adj: sparse.csr_matrix, n_neighbors: int) -> Tuple[List[int], List[float]]: 
+    # Determine target number of neighbors (excluding self)
+    k_target = n_neighbors - 1
+    
+    # Fast slice using CSR internal structures
+    # Accessing .indptr directly is much faster than adj[i, :]
+    start, end = adj.indptr[i], adj.indptr[i+1]
+    row_indices = adj.indices[start:end]
+    row_data = adj.data[start:end]
+
+    # Filter out self-loops
+    mask = row_indices != i
+    valid_idx = row_indices[mask]
+    valid_wgt = row_data[mask]
+    
+    n_available = len(valid_idx)
+    
+    # optimized using argpartition
+    if n_available > k_target:
+        # Find smallest k elements 
+        partitioned_idx = np.argpartition(valid_wgt, k_target)[:k_target]
+
+        # Sort only these top k elements for consistent order
+        top_k_local_order = np.argsort(valid_wgt[partitioned_idx])
+        selection = partitioned_idx[top_k_local_order]
+        
+        final_idx = valid_idx[selection]
+        final_wgt = valid_wgt[selection]
+    else:
+        sort_order = np.argsort(valid_wgt)
+        final_idx = valid_idx[sort_order]
+        final_wgt = valid_wgt[sort_order]
+
+    # Construct result: [Self, Neighbor_1, ... Neighbor_k, 0, 0...]
+    curr_idx = [i]
+    curr_wgt = [0.0]
+    
+    # Add found neighbors
+    curr_idx.extend(final_idx)
+    curr_wgt.extend(final_wgt)
+    
+    # Pad with zeros if length is less than n_neighbors
+    pad_len = n_neighbors - len(curr_idx)
+    if pad_len > 0:
+        curr_idx.extend([0] * pad_len)
+        curr_wgt.extend([0.0] * pad_len)
+        
+    return curr_idx, curr_wgt
+
+### Main function: Convert sparse adjacency matrix to KNN index and weight matrices.
+def adj_to_knn(adj: sparse.spmatrix, n_neighbors: int = 30) -> Tuple[np.ndarray, np.ndarray]:
+    
+    # Ensure matrix is in correct format
+    if not sparse.isspmatrix_csr(adj):
+        adj = adj.tocsr()
+
+    n_obs = adj.shape[0]
+
+    # Call external function using list comprehension
+    results = [get_row_knn(i, adj, n_neighbors) for i in range(n_obs)]
+
+    # Cobime the result
+    list_idx, list_wgt = zip(*results)
+
+    return np.array(list_idx, dtype=int), np.array(list_wgt, dtype=adj.dtype)
 
 
 # Function for mack gene calculation
