@@ -4,10 +4,8 @@ import pandas as pd
 from numpy.typing import NDArray
 from anndata import AnnData
 import scipy.sparse as sp
-
-from graphvelo.utils import adj_to_knn as gv_adj_to_knn
-from graphvelo.utils import mack_score as gv_mack_score
-
+from scipy import sparse
+from typing import List, Tuple
 
 ### This is Helper function to process a single row.
 def get_row_knn(i: int, adj: sparse.csr_matrix, n_neighbors: int) -> Tuple[List[int], List[float]]: 
