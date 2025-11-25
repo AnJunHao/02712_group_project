@@ -14,7 +14,7 @@ def _estimate_dt(
     dt = np.zeros(X.shape[0])
     #range through each cell
     for i, ind in enumerate(nbrs_idx):
-        diff = X[neighbors] - X[i]  #difference between neighbors and cell i
+        diff = X[ind] - X[i]  #difference between neighbors and cell i
         local_density = np.mean(np.linalg.norm(diff, axis=1))   #local density estimation
         velocity_norm = np.linalg.norm(V[i])    #norm of velocity vector
         dt[i] = np.median(local_density / velocity_norm)  #time step estimation
