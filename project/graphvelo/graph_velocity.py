@@ -27,6 +27,7 @@ import matplotlib.pyplot as plt
 from .tangent_space import corr_kernel, cos_corr, density_corrected_transition_matrix, _estimate_dt
 
 
+#Solve phi_i (weights to neighbors) for cell i by minimizing the tangent-space loss.
 def regression_phi(
     i: int, 
     X: np.ndarray,
@@ -39,98 +40,43 @@ def regression_phi(
     loss_func: str = "linear",
     norm_dist: bool = False,
 ):
-    """
-    Compute the regression coefficients (phi) for cell i in the tangent space.
-    
-    Parameters:
-        i (int): The index of the cell to process.
-        X (np.ndarray): The coordinate matrix (cells x genes).
-        V (np.ndarray): The velocity matrix (cells x genes).
-        C (np.ndarray): The correlation (or transition) matrix (cells x ?).
-        nbrs (list): List of neighbor indices for each cell.
-        a (float): Weight for the reconstruction error term.
-        b (float): Weight for the cosine similarity term.
-        r (float): Weight for the regularization term.
-        loss_func (str): Loss function type ('linear' or 'log').
-        norm_dist (bool): If True, normalize the difference vectors.
-    
-    Returns:
-        tuple: The cell index and the optimized weight vector (phi) for cell i.
-    """
-    x, v, c, idx = X[i], V[i], C[i], nbrs[i]
-    c = c[idx]
 
-    # normalized differences
+    # Extract local info
+    x = X[i]
+    v = V[i]
+    idx = nbrs[i]
+
+    # Correlation weights
+    c = C[i, idx]
+    c_norm = np.linalg.norm(c)
+    if c_norm > 0:
+        c = c / c_norm
+
+    # Local difference vectors
     D = X[idx] - x
+
+    # Normalize distances (optional)
     if norm_dist:
         dist = np.linalg.norm(D, axis=1)
-        dist[dist == 0] = 1
-        D /= dist[:, None]
+        dist = np.where(dist == 0, 1, dist)
+        D = D / dist[:, None]
 
-    # co-optimization
-    c_norm = np.linalg.norm(c)
+    # Solve regression:
+    # Build least squares system
+    A = a * (D.T @ D) + r * np.eye(len(idx))
+    
+    # RHS
+    b_vec = a * (D.T @ v) + b * c
 
-    def func(w):
-        v_ = w @ D
+    # Solve linear system
+    try:
+        w = np.linalg.solve(A, b_vec)
+    except np.linalg.LinAlgError:
+        w = np.linalg.lstsq(A, b_vec, rcond=None)[0]
 
-        # cosine similarity between w and c
-        if b == 0:
-            sim = 0
-        else:
-            cw = c_norm * np.linalg.norm(w)
-            if cw > 0:
-                sim = c.dot(w) / cw
-            else:
-                sim = 0
+    return i, w
 
-        # reconstruction error between v_ and v
-        rec = v_ - v
-        rec = rec.dot(rec)
-        if loss_func is None or loss_func == "linear":
-            rec = rec
-        elif loss_func == "log":
-            rec = np.log(rec)
-        else:
-            raise NotImplementedError(
-                f"The function {loss_func} is not supported. Choose either `linear` or `log`."
-            )
-
-        # regularization
-        reg = 0 if r == 0 else w.dot(w)
-
-        ret = a * rec - b * sim + r * reg
-        return ret
-
-    def fjac(w):
-        v_ = w @ D
-
-        # reconstruction error
-        jac_con = 2 * a * D @ (v_ - v)
-
-        if loss_func is None or loss_func == "linear":
-            jac_con = jac_con
-        elif loss_func == "log":
-            jac_con = jac_con / (v_ - v).dot(v_ - v)
-
-        # cosine similarity
-        w_norm = np.linalg.norm(w)
-        if w_norm == 0 or b == 0:
-            jac_sim = 0
-        else:
-            jac_sim = b * (c / (w_norm * c_norm) - w.dot(c) / (w_norm**3 * c_norm) * w)
-
-        # regularization
-        if r == 0:
-            jac_reg = 0
-        else:
-            jac_reg = 2 * r * w
-
-        return jac_con - jac_sim + jac_reg
-
-    res = minimize(func, x0=C[i, idx], jac=fjac)
-    return i, res["x"]
-
-d##Learn phi coefficients (transition weights) in tangent space.
+##Learn phi coefficients (transition weights) in tangent space.
 def tangent_space_projection(
     X: np.ndarray,
     V: np.ndarray,
