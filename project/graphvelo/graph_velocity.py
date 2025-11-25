@@ -2,6 +2,14 @@ import numpy as np
 from anndata import AnnData
 from numpy.typing import NDArray
 import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+import scipy.sparse as sp
+from scipy.sparse import csr_matrix, issparse
+from tqdm import tqdm
+from scipy.optimize import minimize
+from joblib import Parallel, delayed
+from .tangent_space import corr_kernel, cos_corr, density_corrected_transition_matrix, _estimate_dt
 
 
 class GraphVelo():
