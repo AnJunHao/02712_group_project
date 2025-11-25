@@ -1,17 +1,16 @@
-import numpy as np
-from anndata import AnnData
-from numpy.typing import NDArray
-import seaborn as sns
-import matplotlib.pyplot as plt
-from sklearn.decomposition import PCA
-import scipy.sparse as sp
-from scipy.sparse import csr_matrix, issparse
-from tqdm import tqdm
-from scipy.optimize import minimize
-from joblib import Parallel, delayed
-from .tangent_space import corr_kernel, cos_corr, density_corrected_transition_matrix, _estimate_dt
 import os
 import logging
+import warnings
+
+import numpy as np
+from tqdm import tqdm
+import scipy.sparse as sp
+from scipy.optimize import minimize
+from sklearn.decomposition import PCA
+from joblib import Parallel, delayed
+import matplotlib.pyplot as plt
+
+from .tangent_space import corr_kernel, cos_corr, density_corrected_transition_matrix, _estimate_dt
 
 
 def regression_phi(
@@ -27,43 +26,95 @@ def regression_phi(
     norm_dist: bool = False,
 ):
     """
-    Solve phi_i (weights to neighbors) for cell i by minimizing 
-    L(w) = a||Dw - v||^2 - b <w, c> + r||w||^2
+    Compute the regression coefficients (phi) for cell i in the tangent space.
+    
+    Parameters:
+        i (int): The index of the cell to process.
+        X (np.ndarray): The coordinate matrix (cells x genes).
+        V (np.ndarray): The velocity matrix (cells x genes).
+        C (np.ndarray): The correlation (or transition) matrix (cells x ?).
+        nbrs (list): List of neighbor indices for each cell.
+        a (float): Weight for the reconstruction error term.
+        b (float): Weight for the cosine similarity term.
+        r (float): Weight for the regularization term.
+        loss_func (str): Loss function type ('linear' or 'log').
+        norm_dist (bool): If True, normalize the difference vectors.
+    
+    Returns:
+        tuple: The cell index and the optimized weight vector (phi) for cell i.
     """
+    x, v, c, idx = X[i], V[i], C[i], nbrs[i]
+    c = c[idx]
 
-    # Extract local data
-    x = X[i]
-    v = V[i]
-    idx = nbrs[i]
-
-    # Correlation weights
-    c = C[i, idx]
-    c_norm = np.linalg.norm(c)
-    if c_norm > 1e-12:
-        c = c / c_norm
-
-    # Local direction vectors
+    # normalized differences
     D = X[idx] - x
-
-    # Normalize distances if needed
     if norm_dist:
         dist = np.linalg.norm(D, axis=1)
         dist[dist == 0] = 1
-        D = D / dist[:, None]
+        D /= dist[:, None]
 
-    # Build normal equation system:
-    # (a DᵀD + rI) w = (a Dᵀv + b c)
-    A = a * (D.T @ D) + r * np.eye(len(idx))
-    b_vec = a * (D.T @ v) + b * c
+    # co-optimization
+    c_norm = np.linalg.norm(c)
 
-    # Solve system
-    try:
-        w = np.linalg.solve(A, b_vec)
-    except np.linalg.LinAlgError:
-        w = np.linalg.lstsq(A, b_vec, rcond=None)[0]
+    def func(w):
+        v_ = w @ D
 
-    return i, w
+        # cosine similarity between w and c
+        if b == 0:
+            sim = 0
+        else:
+            cw = c_norm * np.linalg.norm(w)
+            if cw > 0:
+                sim = c.dot(w) / cw
+            else:
+                sim = 0
 
+        # reconstruction error between v_ and v
+        rec = v_ - v
+        rec = rec.dot(rec)
+        if loss_func is None or loss_func == "linear":
+            rec = rec
+        elif loss_func == "log":
+            rec = np.log(rec)
+        else:
+            raise NotImplementedError(
+                f"The function {loss_func} is not supported. Choose either `linear` or `log`."
+            )
+
+        # regularization
+        reg = 0 if r == 0 else w.dot(w)
+
+        ret = a * rec - b * sim + r * reg
+        return ret
+
+    def fjac(w):
+        v_ = w @ D
+
+        # reconstruction error
+        jac_con = 2 * a * D @ (v_ - v)
+
+        if loss_func is None or loss_func == "linear":
+            jac_con = jac_con
+        elif loss_func == "log":
+            jac_con = jac_con / (v_ - v).dot(v_ - v)
+
+        # cosine similarity
+        w_norm = np.linalg.norm(w)
+        if w_norm == 0 or b == 0:
+            jac_sim = 0
+        else:
+            jac_sim = b * (c / (w_norm * c_norm) - w.dot(c) / (w_norm**3 * c_norm) * w)
+
+        # regularization
+        if r == 0:
+            jac_reg = 0
+        else:
+            jac_reg = 2 * r * w
+
+        return jac_con - jac_sim + jac_reg
+
+    res = minimize(func, x0=C[i, idx], jac=fjac)
+    return i, res["x"]
 
 def tangent_space_projection(
     X: np.ndarray,
@@ -305,6 +356,7 @@ class GraphVelo():
                 delta_X[i] = T_i.dot(diff_emb)
 
         return sp.csr_matrix(delta_X) if sparse_emb else delta_X
+
     def plot_phi_dist(self):
         """
         Plot the distribution of the learned phi coefficients.
