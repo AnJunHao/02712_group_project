@@ -6,6 +6,7 @@ from anndata import AnnData
 import scipy.sparse as sp
 from scipy import sparse
 from typing import List, Tuple
+from tqdm import tqdm
 
 ### This is Helper function to process a single row.
 def get_row_knn(i: int, adj: sparse.csr_matrix, n_neighbors: int) -> Tuple[List[int], List[float]]: 
@@ -162,6 +163,37 @@ def mack_score(
     add_prefix: str | None = None,
     return_score: bool = False,
 ) -> pd.DataFrame | None:
+
+    return gv_mack_score(
+        adata,
+        n_neighbors,
+        basis,
+        tkey,
+        genes,
+        ekey,
+        vkey,
+        X_data,
+        V_data,
+        n_jobs,
+        add_prefix,
+        return_score,
+    )
+
+
+def gv_mack_score(
+    adata: AnnData,
+    n_neighbors: int | None = None,
+    basis: str | None = None,
+    tkey: str | None = None,
+    genes: list | None = None,
+    ekey: str = "M_s",
+    vkey: str = "velocity_S",
+    X_data: NDArray[np.float64] | None = None,
+    V_data: NDArray[np.float64] | None = None,
+    n_jobs: int = -1,
+    add_prefix: str | None = None,
+    return_score: bool = False,
+) -> pd.DataFrame | None:
     
          # Determine the number of jobs to use.
     if (n_jobs is None or not isinstance(n_jobs, int) or n_jobs < 0 or
@@ -212,30 +244,22 @@ def mack_score(
     t = t_data.flatten()
     # Compute MacK score per gene
     rows = []
-    for g in genes:
-        x = X_data[:, g].flatten()
-        v = V_data[:, g].flatten()
+
+    for gene_i, gene in tqdm(enumerate(genes)):
+        x = X_data[:, gene_i].flatten()
+        v = V_data[:, gene_i].flatten()
         scores = calculate_mack_score_numba(x, v, nbrs_idx, t)
-        rows.append((g, np.mean(scores)))
+        rows.append((gene, np.mean(scores)))
 
 
     mack_score_results = pd.DataFrame(rows, columns=["gene_name", "mack_score"])
 
+
+    mack_score_results = mack_score_results.reset_index().set_index("gene_name")
+    mack_score_results = mack_score_results.astype({"mack_score": "float64"})
+
+    velo_conf_key = "mack_score"
+    adata.var[velo_conf_key] = np.nan
+    adata.var.loc[genes, velo_conf_key] = mack_score_results.loc[genes, "mack_score"]   
+
         
-
-
-
-    return gv_mack_score(
-        adata,
-        n_neighbors,
-        basis,
-        tkey,
-        genes,
-        ekey,
-        vkey,
-        X_data,
-        V_data,
-        n_jobs,
-        add_prefix,
-        return_score,
-    )
