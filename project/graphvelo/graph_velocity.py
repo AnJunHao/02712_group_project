@@ -130,6 +130,7 @@ def regression_phi(
     res = minimize(func, x0=C[i, idx], jac=fjac)
     return i, res["x"]
 
+d##Learn phi coefficients (transition weights) in tangent space.
 def tangent_space_projection(
     X: np.ndarray,
     V: np.ndarray,
@@ -141,69 +142,34 @@ def tangent_space_projection(
     loss_func: str = "linear",
     n_jobs: int = None,
 ):
-    """
-    The function generates a graph based on the velocity data by minimizing the loss function:
-                    L(w_i) = a |v_ - v|^2 - b cos(u, v_) + lambda * \sum_j |w_ij|^2
-    where v_ = \sum_j w_ij*d_ij. The flow from i- to j-th node is returned as the basis matrix phi[i, j],
+    max_jobs = os.cpu_count() ## Determine number of jobs
+    if not isinstance(n_jobs, int) or n_jobs <= 0 or n_jobs > max_jobs:
+        n_jobs = max_jobs
 
-    Arguments
-    ---------
-        X: :class:`~numpy.ndarray`
-            The coordinates of cells in the expression space.
-        V: :class:`~numpy.ndarray`
-            The velocity vectors in the expression space.
-        C: :class:`~numpy.ndarray`
-            The transition matrix of cells based on the correlation/cosine kernel.
-        nbrs: list
-            List of neighbor indices for each cell.
-        a: float (default 1.0)
-            The weight for preserving the velocity length.
-        b: float (default 1.0)
-            The weight for the cosine similarity.
-        r: float (default 1.0)
-            The weight for the regularization.
-        n_jobs: `int` (default: available threads)
-            Number of parallel jobs.
+    valid_genes = ~np.isnan(V.sum(axis=0)) # Filter genes with NaN velocity
+    X = X[:, valid_genes]
+    V = V[:, valid_genes]
 
-    Returns
-    -------
-        E: :class:`~numpy.ndarray`
-            The phi matrix.
-    """
-    if (n_jobs is None or not isinstance(n_jobs, int) or n_jobs < 0 or
-            n_jobs > os.cpu_count()):
-        n_jobs = os.cpu_count()
-    if isinstance(n_jobs, int):
-        logging.info(f'running {n_jobs} jobs in parallel')
+    n_cells = X.shape[0]
+    E = np.zeros((n_cells, n_cells), dtype=float)
 
-    vgenes = np.ones(V.shape[-1], dtype=bool)
-    vgenes &= ~np.isnan(V.sum(0))
-    V = V[:, vgenes]
-    X = X[:, vgenes]
 
-    E = np.zeros((X.shape[0], X.shape[0]))
-
-    res = Parallel(n_jobs=n_jobs, backend='loky')(
+    ## Parallel phi regression
+    parallel_results = Parallel(n_jobs=n_jobs, backend="loky")(
         delayed(regression_phi)(
-            i, 
-            X,
-            V,
-            C,
-            nbrs,
-            a,
-            b,
-            r,
-            loss_func,
+            i, X, V, C, nbrs, a, b, r, loss_func
         )
         for i in tqdm(
-        range(X.shape[0]),
-        total=X.shape[0],
-        desc="Learning Phi in tangent space projection.",
-    ))
+            range(n_cells),
+            total=n_cells,
+            desc="Learning Phi in tangent space projection.",
+        )
+    )
 
-    for i, res_x in res:
-        E[i][nbrs[i]] = res_x
-    
+    # Fill phi matrix
+    for i, phi_i in parallel_results:
+        E[i, nbrs[i]] = phi_i
+
     return E
 
 
@@ -219,6 +185,7 @@ class GraphVelo():
         approx=True,
         n_pcs=30,
         mo=False,):
+        # Convert sparse matrix to dense.
         dense = lambda a: a.A if sp.issparse(a) else np.asarray(a)
 
         # Load data from provided arguments
