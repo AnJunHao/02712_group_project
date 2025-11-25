@@ -330,47 +330,38 @@ class GraphVelo():
         T = tangent_space_projection(self.X, self.V, P_dc, self.nbrs_idx, a=a, b=b, r=r, loss_func=loss_func, n_jobs=n_jobs)
         self.T = sp.csr_matrix(T)
         self.params.update(train_params)
-    
-    def project_velocity(self, X_embedding, T=None) -> np.ndarray:
-        """
-        Project the velocity vectors onto a low-dimensional embedding.
-        
-        Parameters:
-            X_embedding (np.ndarray): The low-dimensional embedding coordinates.
-            T (optional): An external phi basis. If None, uses the learned phi coefficients.
-        
-        Returns:
-            np.ndarray: The projected velocity vectors in the embedding space.
-        """
 
+    #Project the velocity vectors onto a low-dimensional embedding.
+     def project_velocity(
+        self, X_embedding, T = None
+    ) -> np.ndarray:
         if T is None:
             T = self.T
         else:
-            logging.warning('You are projecting the velocity vectors with an external `phi` basis.')
-        n = T.shape[0]
-        delta_X = np.zeros((n, X_embedding.shape[1]))
-
-        sparse_emb = False
-        if sp.issparse(X_embedding):
+            logging.warning(
+            "You are projecting the velocity vectors with an external `phi` basis."
+            )
+        n_cells, n_dim = T.shape[0], X_embedding.shape[1]
+        delta_X = np.zeros((n_cells, n_dim))
+    
+        sparse_input = sp.issparse(X_embedding)
+        if sparse_input:
             X_embedding = X_embedding.A
-            sparse_emb = True
-
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             for i in tqdm(
-                range(n),
-                total=n,
-                desc="projecting velocity vector to low dimensional embedding",
+                range(n_cells),
+                total=n_cells,
+                desc="projecting velocity vectors to embedding",
             ):
-                idx = T[i].indices
-                diff_emb = X_embedding[idx] - X_embedding[i, None]
-                if np.isnan(diff_emb).sum() != 0:
-                    diff_emb[np.isnan(diff_emb)] = 0
-                T_i = T[i].data
-                delta_X[i] = T_i.dot(diff_emb)
+                idx = T[i].indices            
+                diff = X_embedding[idx] - X_embedding[i]  
+                diff = np.nan_to_num(diff)     
 
-        return sp.csr_matrix(delta_X) if sparse_emb else delta_X
+                weights = T[i].data            
+                delta_X[i] = weights.dot(diff) 
 
+        return sp.csr_matrix(delta_X) if sparse_input else delta_X
      ####Plot the distribution of the learned phi coefficients.
     def plot_phi_dist(self):
         T = self.T.A
