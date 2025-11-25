@@ -309,7 +309,7 @@ class GraphVelo():
                        'n_pcs': n_pcs}
 
     ####Train the GraphVelo model by learning the phi coefficients in tangent space.
-    def train(self, a=1, b=10, r=1, loss_func=None, transition_matrix=None, softmax_adjusted=False, n_jobs=None)
+    def train(self, a=1, b=10, r=1, loss_func=None, transition_matrix=None, softmax_adjusted=False, n_jobs=None):
          # Decide loss function
         loss_func = loss_func or ("linear" if self.approx else "log")
         # Store parameters
