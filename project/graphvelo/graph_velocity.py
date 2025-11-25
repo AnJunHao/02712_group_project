@@ -27,7 +27,6 @@ import matplotlib.pyplot as plt
 from .tangent_space import corr_kernel, cos_corr, density_corrected_transition_matrix, _estimate_dt
 
 
-#Solve phi_i (weights to neighbors) for cell i by minimizing the tangent-space loss.
 def regression_phi(
     i: int, 
     X: np.ndarray,
@@ -40,41 +39,37 @@ def regression_phi(
     loss_func: str = "linear",
     norm_dist: bool = False,
 ):
+    """
+    Compute the regression coefficients (phi) for cell i in the tangent space.
+    
+    Parameters:
+        i (int): The index of the cell to process.
+        X (np.ndarray): The coordinate matrix (cells x genes).
+        V (np.ndarray): The velocity matrix (cells x genes).
+        C (np.ndarray): The correlation (or transition) matrix (cells x ?).
+        nbrs (list): List of neighbor indices for each cell.
+        a (float): Weight for the reconstruction error term.
+        b (float): Weight for the cosine similarity term.
+        r (float): Weight for the regularization term.
+        loss_func (str): Loss function type ('linear' or 'log').
+        norm_dist (bool): If True, normalize the difference vectors.
+    
+    Returns:
+        tuple: The cell index and the optimized weight vector (phi) for cell i.
+    """
+    x, v, c, idx = X[i], V[i], C[i], nbrs[i]
+    c = c[idx]
 
-    # Extract local info
-    x = X[i]
-    v = V[i]
-    idx = nbrs[i]
-
-    # Correlation weights
-    c = C[i, idx]
-    c_norm = np.linalg.norm(c)
-    if c_norm > 0:
-        c = c / c_norm
-
-    # Local difference vectors
+    # normalized differences
     D = X[idx] - x
-
-    # Normalize distances (optional)
     if norm_dist:
         dist = np.linalg.norm(D, axis=1)
-        dist = np.where(dist == 0, 1, dist)
-        D = D / dist[:, None]
+        dist[dist == 0] = 1
+        D /= dist[:, None]
 
-    # Solve regression:
-    # Build least squares system
-    A = a * (D.T @ D) + r * np.eye(len(idx))
-    
-    # RHS
-    b_vec = a * (D.T @ v) + b * c
+    # co-optimization
+    c_norm = np.linalg.norm(c)
 
-    # Solve linear system
-    try:
-        w = np.linalg.solve(A, b_vec)
-    except np.linalg.LinAlgError:
-        w = np.linalg.lstsq(A, b_vec, rcond=None)[0]
-
-    return i, w
 
     def func(w):
         v_ = w @ D
