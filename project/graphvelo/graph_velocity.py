@@ -364,7 +364,7 @@ class GraphVelo():
         plt.show()
 
     # Write the learned phi coefficients to the AnnData object.
-    def write_to_adata(self, adata, key: None):
+    def write_to_adata(self, adata, key = None):
 
         key = key or "gv"   
         params_key = f"{key}_params"
