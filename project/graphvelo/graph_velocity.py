@@ -208,14 +208,7 @@ def tangent_space_projection(
 
 
 class GraphVelo():
-    """
-    GraphVelo encapsulates the workflow for learning a manifold-constrained velocity projection.
-    
-    It supports computing a low-dimensional representation of the gene expression space,
-    estimating a velocity graph (phi coefficients), and transform velocity vectors to different basis.
-    """
-
-    def __init__(
+     def __init__(
         self,
         adata, 
         xkey='Ms', 
@@ -226,87 +219,90 @@ class GraphVelo():
         approx=True,
         n_pcs=30,
         mo=False,):
-        """
-        Initialize the GraphVelo object.
-        
-        Parameters:
-            adata: AnnData object containing the expression and velocity data.
-            xkey (str): Key in adata.layers for the expression data.
-            vkey (str): Key in adata.layers for the velocity data.
-            X_data, V_data: Optionally provided expression and velocity matrices.
-            gene_subset: Optionally, a subset of genes to use.
-            approx (bool): If True, perform an approximate projection using PCA.
-            n_pcs (int): Number of principal components for dimensionality reduction.
-            mo (bool): Flag indicating if multi-omic data is used (affects neighbor extraction).
-        """
+         # Convert sparse matrix to dense.
+        dense = lambda a: a.A if sp.issparse(a) else np.asarray(a)
 
+        # Load data from provided arguments
         if X_data is not None and V_data is not None:
-            X = np.array(X_data.A if sp.issparse(X_data)
-            else X_data)
-            V = np.array(V_data.A if sp.issparse(V_data)
-            else V_data)
+            X = dense(X_data)
+            V = dense(V_data)
         else:
-            X_org = np.array(
-                adata.layers[xkey].A
-                if sp.issparse(adata.layers[xkey])
-                else adata.layers[xkey]
-            )
-            V_org = np.array(
-                adata.layers[vkey].A
-                if sp.issparse(adata.layers[vkey])
-                else adata.layers[vkey]
-            )
-            
-            subset = np.ones(adata.n_vars, bool)
-            if gene_subset is not None:
-                var_names_subset = adata.var_names.isin(gene_subset)
-                subset &= var_names_subset if len(var_names_subset) > 0 else gene_subset
-            else: 
-                gene_subset = adata.var_names
-            X = X_org[:, subset]
-            V = V_org[:, subset]
+            X_org = dense(adata.layers[xkey])
+            V_org = dense(adata.layers[vkey])
+            X = X_org
+            V = V_org
 
-            nans = np.isnan(np.sum(V, axis=0))
-            logging.info(f"{nans.sum()} genes are removed because of nan velocity values.")
-            if np.any(nans):
-                X = X[:, ~nans]
-                V = V[:, ~nans]
-        self.approx = False
+        # If no subset provided → use all genes
+        if gene_subset is None:
+            gene_subset = adata.var_names
 
-        if "neighbors" not in adata.uns.keys():
-            # Check construction knn in reduced space.
-            if mo:
-                if 'WNN' not in adata.uns.keys():
-                    logging.error("`WNN` not in adata.uns")
-                nbrs_idx = adata.uns['WNN']['indices']
-            else:
-                raise ValueError("Please run dyn.tl.neighbors first.")
+        # Boolean mask over all genes
+        subset = adata.var_names.isin(gene_subset)
+
+        # Select genes
+        X = X[:, subset]
+        V = V[:, subset]
+
+        # Identify genes with NaN velocity values
+        nan_genes = np.isnan(V).any(axis=0)
+        logging.info(f"{nan_genes.sum()} genes are removed because of NaN velocity values.")
+
+        # Remove genes containing NaN
+        if nan_genes.any():
+            X = X[:, ~nan_genes]
+            V = V[:, ~nan_genes]
+
+        # Disable approx for now
+        self.approx = False  
+
+        # Retrieve neighbor graph indices
+        if "neighbors" in adata.uns:
+            nbrs_idx = adata.uns["neighbors"]["indices"]
+
+        elif mo:
+            # Multi-omics mode: use Weighted Nearest Neighbors (WNN)
+            if "WNN" not in adata.uns:
+                logging.error("`WNN` not in adata.uns")
+            nbrs_idx = adata.uns["WNN"]["indices"]
+
         else:
-            nbrs_idx = adata.uns["neighbors"]['indices']
+            raise ValueError("Please run dyn.tl.neighbors first.")
+
         self.nbrs_idx = nbrs_idx
-        
+
+        # Approximation mode: project velocity into PCA space
         if approx:
             self.approx = True
             dt = _estimate_dt(X, V, nbrs_idx)
-            X_plus_V = X + V * dt 
-            X_plus_V[X_plus_V < 0] = 0 
+
+            X_plus_V = X + V * dt
+            X_plus_V[X_plus_V < 0] = 0
+
             X = np.log1p(X)
             X_plus_V = np.log1p(X_plus_V)
+
             pca = PCA(n_components=n_pcs, svd_solver='arpack', random_state=0)
             pca_fit = pca.fit(X)
+
             X_pca = pca_fit.transform(X)
             Y_pca = pca_fit.transform(X_plus_V)
             V_pca = (Y_pca - X_pca) / dt
+
             self.X = X_pca
             self.V = V_pca
-        else: 
+        # Non-approximation mode: use original data
+        else:
             self.X = X
             self.V = V
-        self.params = {'xkey': xkey,
-                       'vkey': vkey,
-                       'gene_subset': list(gene_subset),
-                       'approx': approx,
-                       'n_pcs': n_pcs}
+
+        # Store parameters
+        self.params = {
+            "xkey": xkey,
+            "vkey": vkey,
+            "gene_subset": list(gene_subset),
+            "approx": approx,
+            "n_pcs": n_pcs,
+        }
 
     ####Train the GraphVelo model by learning the phi coefficients in tangent space.
     def train(self, a=1, b=10, r=1, loss_func=None, transition_matrix=None, softmax_adjusted=False, n_jobs=None):
