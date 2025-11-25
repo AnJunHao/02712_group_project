@@ -12,7 +12,7 @@ from joblib import Parallel, delayed
 from .tangent_space import corr_kernel, cos_corr, density_corrected_transition_matrix, _estimate_dt
 import os
 import logging
-import warnings
+
 
 def regression_phi(
     i: int, 
@@ -27,35 +27,42 @@ def regression_phi(
     norm_dist: bool = False,
 ):
     """
-    Compute the regression coefficients (phi) for cell i in the tangent space.
-    
-    Parameters:
-        i (int): The index of the cell to process.
-        X (np.ndarray): The coordinate matrix (cells x genes).
-        V (np.ndarray): The velocity matrix (cells x genes).
-        C (np.ndarray): The correlation (or transition) matrix (cells x ?).
-        nbrs (list): List of neighbor indices for each cell.
-        a (float): Weight for the reconstruction error term.
-        b (float): Weight for the cosine similarity term.
-        r (float): Weight for the regularization term.
-        loss_func (str): Loss function type ('linear' or 'log').
-        norm_dist (bool): If True, normalize the difference vectors.
-    
-    Returns:
-        tuple: The cell index and the optimized weight vector (phi) for cell i.
+    Solve phi_i (weights to neighbors) for cell i by minimizing 
+    L(w) = a||Dw - v||^2 - b <w, c> + r||w||^2
     """
-    x, v, c, idx = X[i], V[i], C[i], nbrs[i]
-    c = c[idx]
 
-    # normalized differences
+    # Extract local data
+    x = X[i]
+    v = V[i]
+    idx = nbrs[i]
+
+    # Correlation weights
+    c = C[i, idx]
+    c_norm = np.linalg.norm(c)
+    if c_norm > 1e-12:
+        c = c / c_norm
+
+    # Local direction vectors
     D = X[idx] - x
+
+    # Normalize distances if needed
     if norm_dist:
         dist = np.linalg.norm(D, axis=1)
         dist[dist == 0] = 1
-        D /= dist[:, None]
+        D = D / dist[:, None]
 
-    # co-optimization
-    c_norm = np.linalg.norm(c)
+    # Build normal equation system:
+    # (a DᵀD + rI) w = (a Dᵀv + b c)
+    A = a * (D.T @ D) + r * np.eye(len(idx))
+    b_vec = a * (D.T @ v) + b * c
+
+    # Solve system
+    try:
+        w = np.linalg.solve(A, b_vec)
+    except np.linalg.LinAlgError:
+        w = np.linalg.lstsq(A, b_vec, rcond=None)[0]
+
+    return i, w
 
 
 def tangent_space_projection(
