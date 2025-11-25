@@ -218,8 +218,9 @@ class GraphVelo():
         gene_subset=None,
         approx=True,
         n_pcs=30,
-        mo=False,):
-         # Convert sparse matrix to dense.
+        mo=False,
+    ):
+
         dense = lambda a: a.A if sp.issparse(a) else np.asarray(a)
 
         # Load data from provided arguments
