@@ -305,3 +305,34 @@ class GraphVelo():
                 delta_X[i] = T_i.dot(diff_emb)
 
         return sp.csr_matrix(delta_X) if sparse_emb else delta_X
+          def plot_phi_dist(self):
+        """
+        Plot the distribution of the learned phi coefficients.
+        
+        This uses seaborn for visualization.
+        """
+        try:
+            import seaborn as sns
+        except ImportError:
+            raise ImportError(
+                "You need to install `seaborn` for `phi` distribution visualization.")
+
+        T = self.T.A
+        sns.distplot(T[T>0])
+        plt.show()
+
+    def write_to_adata(self, adata, key=None):
+        """
+        Write the learned phi coefficients (velocity projection basis) to the AnnData object.
+        
+        Parameters:
+            adata: AnnData object where the phi matrix should be stored.
+            key: The key under which the phi parameters will be saved in adata.
+                 Defaults to 'gv' if not provided.
+        """
+        key = 'gv' if key is None else key
+        adata.uns[f"{key}_params"] = {
+            **adata.uns.get(f"{key}_params", {}),
+            **self.params,
+        }
+        adata.obsp[key] = self.T.copy()
