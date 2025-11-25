@@ -14,6 +14,48 @@ import os
 import logging
 import warnings
 
+##Learn phi coefficients (transition weights) in tangent space.
+def tangent_space_projection(
+    X: np.ndarray,
+    V: np.ndarray,
+    C: np.ndarray,
+    nbrs: list,
+    a: float = 1.0,
+    b: float = 0.0,
+    r: float = 1.0,
+    loss_func: str = "linear",
+    n_jobs: int = None,
+):
+    max_jobs = os.cpu_count() ## Determine number of jobs
+    if not isinstance(n_jobs, int) or n_jobs <= 0 or n_jobs > max_jobs:
+        n_jobs = max_jobs
+
+    valid_genes = ~np.isnan(V.sum(axis=0)) # Filter genes with NaN velocity
+    X = X[:, valid_genes]
+    V = V[:, valid_genes]
+
+    n_cells = X.shape[0]
+    E = np.zeros((n_cells, n_cells), dtype=float)
+
+
+    ## Parallel phi regression
+    parallel_results = Parallel(n_jobs=n_jobs, backend="loky")(
+        delayed(regression_phi)(
+            i, X, V, C, nbrs, a, b, r, loss_func
+        )
+        for i in tqdm(
+            range(n_cells),
+            total=n_cells,
+            desc="Learning Phi in tangent space projection.",
+        )
+    )
+
+    # Fill phi matrix
+    for i, phi_i in parallel_results:
+        E[i, nbrs[i]] = phi_i
+
+    return E
+
 class GraphVelo():
     def __init__(
         self,
