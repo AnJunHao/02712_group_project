@@ -332,9 +332,7 @@ class GraphVelo():
         self.params.update(train_params)
 
     #Project the velocity vectors onto a low-dimensional embedding.
-     def project_velocity(
-        self, X_embedding, T = None
-    ) -> np.ndarray:
+    def project_velocity(self, X_embedding, T=None) -> np.ndarray:
         if T is None:
             T = self.T
         else:
