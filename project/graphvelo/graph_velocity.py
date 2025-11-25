@@ -76,6 +76,66 @@ def regression_phi(
 
     return i, w
 
+    def func(w):
+        v_ = w @ D
+
+        # cosine similarity between w and c
+        if b == 0:
+            sim = 0
+        else:
+            cw = c_norm * np.linalg.norm(w)
+            if cw > 0:
+                sim = c.dot(w) / cw
+            else:
+                sim = 0
+
+        # reconstruction error between v_ and v
+        rec = v_ - v
+        rec = rec.dot(rec)
+        if loss_func is None or loss_func == "linear":
+            rec = rec
+        elif loss_func == "log":
+            rec = np.log(rec)
+        else:
+            raise NotImplementedError(
+                f"The function {loss_func} is not supported. Choose either `linear` or `log`."
+            )
+
+        # regularization
+        reg = 0 if r == 0 else w.dot(w)
+
+        ret = a * rec - b * sim + r * reg
+        return ret
+
+    def fjac(w):
+        v_ = w @ D
+
+        # reconstruction error
+        jac_con = 2 * a * D @ (v_ - v)
+
+        if loss_func is None or loss_func == "linear":
+            jac_con = jac_con
+        elif loss_func == "log":
+            jac_con = jac_con / (v_ - v).dot(v_ - v)
+
+        # cosine similarity
+        w_norm = np.linalg.norm(w)
+        if w_norm == 0 or b == 0:
+            jac_sim = 0
+        else:
+            jac_sim = b * (c / (w_norm * c_norm) - w.dot(c) / (w_norm**3 * c_norm) * w)
+
+        # regularization
+        if r == 0:
+            jac_reg = 0
+        else:
+            jac_reg = 2 * r * w
+
+        return jac_con - jac_sim + jac_reg
+
+    res = minimize(func, x0=C[i, idx], jac=fjac)
+    return i, res["x"]
+
 ##Learn phi coefficients (transition weights) in tangent space.
 def tangent_space_projection(
     X: np.ndarray,
