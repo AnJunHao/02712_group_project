@@ -208,7 +208,7 @@ def tangent_space_projection(
 
 
 class GraphVelo():
-        def __init__(
+    def __init__(
         self,
         adata, 
         xkey='Ms', 
