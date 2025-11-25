@@ -10,7 +10,9 @@ from tqdm import tqdm
 from scipy.optimize import minimize
 from joblib import Parallel, delayed
 from .tangent_space import corr_kernel, cos_corr, density_corrected_transition_matrix, _estimate_dt
-
+import os
+import logging
+import warnings
 
 class GraphVelo():
     def __init__(

@@ -1,8 +1,8 @@
 from typing import Callable
 import numpy as np
 from numpy.typing import NDArray
-from scipy.sparse import csr_matrix
 import scipy.sparse as sp
+from scipy.sparse import csr_matrix, issparse
 import logging
 
 
