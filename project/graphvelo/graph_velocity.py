@@ -208,19 +208,7 @@ def tangent_space_projection(
 
 
 class GraphVelo():
-     def __init__(
-        self,
-        adata, 
-        xkey='Ms', 
-        vkey='velocity', 
-        X_data=None,
-        V_data=None,
-        gene_subset=None,
-        approx=True,
-        n_pcs=30,
-        mo=False,
-    ):
-
+     def __init__(self,adata, xkey='Ms', vkey='velocity', X_data=None, V_data=None, gene_subset=None, approx=True, n_pcs=30, mo=False):
         dense = lambda a: a.A if sp.issparse(a) else np.asarray(a)
 
         # Load data from provided arguments
