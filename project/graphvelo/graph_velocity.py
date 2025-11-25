@@ -305,7 +305,7 @@ class GraphVelo():
                 delta_X[i] = T_i.dot(diff_emb)
 
         return sp.csr_matrix(delta_X) if sparse_emb else delta_X
-          def plot_phi_dist(self):
+    def plot_phi_dist(self):
         """
         Plot the distribution of the learned phi coefficients.
         
