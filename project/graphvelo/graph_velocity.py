@@ -357,13 +357,14 @@ class GraphVelo():
 
         return sp.csr_matrix(delta_X) if sparse_emb else delta_X
 
-    ####Plot the distribution of the learned phi coefficients.
-    def plot_phi_dist(self) -> None:
+     ####Plot the distribution of the learned phi coefficients.
+    def plot_phi_dist(self):
         T = self.T.A
         sns.distplot(T[T>0])
         plt.show()
+
     # Write the learned phi coefficients to the AnnData object.
-    def write_to_adata(self, adata: AnnData, key: str | None = None) -> None:
+    def write_to_adata(self, adata, key: None):
 
         key = key or "gv"   
         params_key = f"{key}_params"
