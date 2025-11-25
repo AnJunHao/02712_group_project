@@ -308,26 +308,43 @@ class GraphVelo():
                        'approx': approx,
                        'n_pcs': n_pcs}
 
-    def train(self, a=1, b=10, r=1, loss_func=None, transition_matrix=None, softmax_adjusted=False, n_jobs=None):
-        """
-        Train the GraphVelo model by learning the phi coefficients in tangent space.
-        
-        Parameters:
-            a, b, r: Weights for the loss function components.
-            loss_func (str): Loss function type; defaults to 'linear' if approx is True, else 'log'.
-            transition_matrix: Optionally provided transition matrix; if not provided, it is computed.
-            softmax_adjusted (bool): Flag for adjusting the softmax in the correlation kernel.
-        """
-
-        if loss_func is None:
-            loss_func = 'linear' if self.approx else 'log'
-        train_params = {'a': a, 'b': b, 'r': r, 'loss_func': loss_func, 'softmax_adjusted': softmax_adjusted}
+    ####Train the GraphVelo model by learning the phi coefficients in tangent space.
+    def train(self, a=1, b=10, r=1, loss_func=None, transition_matrix=None, softmax_adjusted=False, n_jobs=None)
+         # Decide loss function
+        loss_func = loss_func or ("linear" if self.approx else "log")
+        # Store parameters
+        train_params = {
+        "a": a,
+        "b": b,
+        "r": r,
+        "loss_func": loss_func,
+        "softmax_adjusted": softmax_adjusted,
+        }
+        # Compute transition matrix if not provided
         if transition_matrix is None:
-            P = corr_kernel(self.X, self.V, self.nbrs_idx, corr_func=cos_corr, softmax_adjusted=softmax_adjusted)
+            P = corr_kernel(
+            self.X,
+            self.V,
+            self.nbrs_idx,
+            corr_func=cos_corr,
+            softmax_adjusted=softmax_adjusted,
+            )
             P_dc = density_corrected_transition_matrix(P).A
         else:
             P_dc = transition_matrix
-        T = tangent_space_projection(self.X, self.V, P_dc, self.nbrs_idx, a=a, b=b, r=r, loss_func=loss_func, n_jobs=n_jobs)
+
+        # Tangent space projection
+        T = tangent_space_projection(
+        X=self.X,
+        V=self.V,
+        C=P_dc,
+        nbrs=self.nbrs_idx,
+        a=a,
+        b=b,
+        r=r,
+        loss_func=loss_func,
+        n_jobs=n_jobs,
+        )
         self.T = sp.csr_matrix(T)
         self.params.update(train_params)
 
