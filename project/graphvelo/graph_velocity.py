@@ -112,31 +112,31 @@ class GraphVelo():
         softmax_adjusted: bool = False,
         n_jobs: int | None = None,
     ):
-    # Decide loss function
-    loss_func = loss_func or ("linear" if self.approx else "log")
-    # Store parameters
-    train_params = {
+         # Decide loss function
+        loss_func = loss_func or ("linear" if self.approx else "log")
+        # Store parameters
+        train_params = {
         "a": a,
         "b": b,
         "r": r,
         "loss_func": loss_func,
         "softmax_adjusted": softmax_adjusted,
-    }
-    # Compute transition matrix if not provided
-    if transition_matrix is None:
-        P = corr_kernel(
+        }
+        # Compute transition matrix if not provided
+        if transition_matrix is None:
+            P = corr_kernel(
             self.X,
             self.V,
             self.nbrs_idx,
             corr_func=cos_corr,
             softmax_adjusted=softmax_adjusted,
-        )
-        P_dc = density_corrected_transition_matrix(P).A
-    else:
-        P_dc = transition_matrix
+            )
+            P_dc = density_corrected_transition_matrix(P).A
+        else:
+            P_dc = transition_matrix
 
-    # Tangent space projection
-    T = tangent_space_projection(
+        # Tangent space projection
+        T = tangent_space_projection(
         X=self.X,
         V=self.V,
         P=P_dc,
@@ -146,41 +146,41 @@ class GraphVelo():
         r=r,
         loss_func=loss_func,
         n_jobs=n_jobs,
-    )
-    self.T = sp.csr_matrix(T)
-    self.params.update(train_params)
+        )
+        self.T = sp.csr_matrix(T)
+        self.params.update(train_params)
 
     #Project the velocity vectors onto a low-dimensional embedding.
     def project_velocity(
         self, X_embedding: NDArray[np.float64], T: NDArray[np.float64] | None = None
     ) -> NDArray[np.float64]:
-    if T is None:
-        T = self.T
-    else:
-        logging.warning(
+        if T is None:
+            T = self.T
+        else:
+            logging.warning(
             "You are projecting the velocity vectors with an external `phi` basis."
-        )
-    n_cells, n_dim = T.shape[0], X_embedding.shape[1]
-    delta_X = np.zeros((n_cells, n_dim))
+            )
+        n_cells, n_dim = T.shape[0], X_embedding.shape[1]
+        delta_X = np.zeros((n_cells, n_dim))
     
-    sparse_input = sp.issparse(X_embedding)
-    if sparse_input:
-        X_embedding = X_embedding.A
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        for i in tqdm(
-            range(n_cells),
-            total=n_cells,
-            desc="projecting velocity vectors to embedding",
-        ):
-            idx = T[i].indices            
-            diff = X_embedding[idx] - X_embedding[i]  
-            diff = np.nan_to_num(diff)     
+        sparse_input = sp.issparse(X_embedding)
+        if sparse_input:
+            X_embedding = X_embedding.A
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            for i in tqdm(
+                range(n_cells),
+                total=n_cells,
+                desc="projecting velocity vectors to embedding",
+            ):
+                idx = T[i].indices            
+                diff = X_embedding[idx] - X_embedding[i]  
+                diff = np.nan_to_num(diff)     
 
-            weights = T[i].data            
-            delta_X[i] = weights.dot(diff) 
+                weights = T[i].data            
+                delta_X[i] = weights.dot(diff) 
 
-    return sp.csr_matrix(delta_X) if sparse_input else delta_X
+        return sp.csr_matrix(delta_X) if sparse_input else delta_X
 
     ####Plot the distribution of the learned phi coefficients.
     def plot_phi_dist(self) -> None:
