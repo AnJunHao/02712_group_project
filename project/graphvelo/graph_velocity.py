@@ -191,7 +191,7 @@ class GraphVelo():
         T = tangent_space_projection(
         X=self.X,
         V=self.V,
-        P=P_dc,
+        C=P_dc,
         nbrs_idx=self.nbrs_idx,
         a=a,
         b=b,
