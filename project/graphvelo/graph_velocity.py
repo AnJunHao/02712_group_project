@@ -14,6 +14,56 @@ import os
 import logging
 import warnings
 
+#Solve phi_i (weights to neighbors) for cell i by minimizing the tangent-space loss.
+def regression_phi(
+    i: int, 
+    X: np.ndarray,
+    V: np.ndarray,
+    C: np.ndarray,
+    nbrs: list,
+    a: float = 1.0,
+    b: float = 0.0,
+    r: float = 1.0,
+    loss_func: str = "linear",
+    norm_dist: bool = False,
+):
+
+    # Extract local info
+    x = X[i]
+    v = V[i]
+    idx = nbrs[i]
+
+    # Correlation weights
+    c = C[i, idx]
+    c_norm = np.linalg.norm(c)
+    if c_norm > 0:
+        c = c / c_norm
+
+    # Local difference vectors
+    D = X[idx] - x
+
+    # Normalize distances (optional)
+    if norm_dist:
+        dist = np.linalg.norm(D, axis=1)
+        dist = np.where(dist == 0, 1, dist)
+        D = D / dist[:, None]
+
+    # Solve regression:
+    # Build least squares system
+    A = a * (D.T @ D) + r * np.eye(len(idx))
+    
+    # RHS
+    b_vec = a * (D.T @ v) + b * c
+
+    # Solve linear system
+    try:
+        w = np.linalg.solve(A, b_vec)
+    except np.linalg.LinAlgError:
+        w = np.linalg.lstsq(A, b_vec, rcond=None)[0]
+
+    return i, w
+
+
 ##Learn phi coefficients (transition weights) in tangent space.
 def tangent_space_projection(
     X: np.ndarray,
