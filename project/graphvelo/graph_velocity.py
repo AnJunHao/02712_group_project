@@ -192,7 +192,7 @@ class GraphVelo():
         X=self.X,
         V=self.V,
         C=P_dc,
-        nbrs_idx=self.nbrs_idx,
+        nbrs=self.nbrs_idx,
         a=a,
         b=b,
         r=r,
