@@ -76,7 +76,7 @@ def adj_to_knn(adj: sparse.spmatrix, n_neighbors: int = 30) -> Tuple[np.ndarray,
 
     return np.array(list_idx, dtype=int), np.array(list_wgt, dtype=adj.dtype)
 
-@njit(parallel=True)
+
 # Function for mack gene calculation
 def calculate_mack_score_numba(x, v, nbrs_idx, t, eps=1e-5):
     score = np.zeros(x.shape[0])
