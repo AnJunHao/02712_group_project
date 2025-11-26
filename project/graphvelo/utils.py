@@ -7,6 +7,7 @@ import scipy.sparse as sp
 from scipy import sparse
 from typing import List, Tuple
 from tqdm import tqdm
+from numba import njit, prange
 
 ### This is Helper function to process a single row.
 def get_row_knn(i: int, adj: sparse.csr_matrix, n_neighbors: int) -> Tuple[List[int], List[float]]: 
@@ -75,7 +76,7 @@ def adj_to_knn(adj: sparse.spmatrix, n_neighbors: int = 30) -> Tuple[np.ndarray,
 
     return np.array(list_idx, dtype=int), np.array(list_wgt, dtype=adj.dtype)
 
-
+@njit(parallel=True)
 # Function for mack gene calculation
 def calculate_mack_score_numba(x, v, nbrs_idx, t, eps=1e-5):
     score = np.zeros(x.shape[0])
@@ -113,6 +114,52 @@ def calculate_mack_score_numba(x, v, nbrs_idx, t, eps=1e-5):
 
         score[i] /= len(nbrs)
     return score
+
+
+@njit(parallel=True)
+def compute_all_mack_scores(X_data, V_data, nbrs_idx, t, eps=1e-5):
+    n_cells, n_genes = X_data.shape
+    out = np.zeros(n_genes)
+
+    for gene_i in prange(n_genes):     # <--- parallel across genes!
+        x = X_data[:, gene_i]
+        v = V_data[:, gene_i]
+        n = x.shape[0]
+        score = 0.0
+
+        for i in range(n):
+            nbrs = nbrs_idx[i]
+            ln = len(nbrs)
+            c = 0
+            for j in range(ln):
+                d_x = x[i] - x[nbrs[j]]
+                d_t = t[i] - t[nbrs[j]] + eps
+
+                # sign(d_x / d_t)
+                r = d_x / d_t
+                if r > 0:
+                    sign = 1
+                elif r < 0:
+                    sign = -1
+                else:
+                    sign = 0
+
+                s_v = v[i]
+                if s_v > 0:
+                    s_v = 1
+                elif s_v < 0:
+                    s_v = -1
+                else:
+                    s_v = 0
+
+                if sign == s_v:
+                    c += 1
+
+            score += c / ln
+
+        out[gene_i] = score / n  # mean of all cells for this gene
+
+    return out
 
 
 from pynndescent import NNDescent # for "pynn", "umap"
@@ -195,6 +242,7 @@ def gv_mack_score(
     return_score: bool = False,
 ) -> pd.DataFrame | None:
     
+    
          # Determine the number of jobs to use.
     if (n_jobs is None or not isinstance(n_jobs, int) or n_jobs < 0 or
             n_jobs > os.cpu_count()):
@@ -242,14 +290,13 @@ def gv_mack_score(
         t_data = np.array(t_annot)
 
     t = t_data.flatten()
-    # Compute MacK score per gene
-    rows = []
 
-    for gene_i, gene in tqdm(enumerate(genes)):
-        x = X_data[:, gene_i].flatten()
-        v = V_data[:, gene_i].flatten()
-        scores = calculate_mack_score_numba(x, v, nbrs_idx, t)
-        rows.append((gene, np.mean(scores)))
+    scores = compute_all_mack_scores(X_data, V_data, nbrs_idx, t)
+
+    rows = []
+    for gene_i, gene in enumerate(genes):
+       rows.append((gene, scores[gene_i]))
+
 
 
     mack_score_results = pd.DataFrame(rows, columns=["gene_name", "mack_score"])
@@ -261,5 +308,3 @@ def gv_mack_score(
     velo_conf_key = "mack_score"
     adata.var[velo_conf_key] = np.nan
     adata.var.loc[genes, velo_conf_key] = mack_score_results.loc[genes, "mack_score"]   
-
-        
