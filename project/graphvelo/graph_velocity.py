@@ -54,6 +54,7 @@ def regression_phi(
     c_norm = np.linalg.norm(c)
 
 
+
 ##Learn phi coefficients (transition weights) in tangent space.
 def tangent_space_projection(
     X: np.ndarray,
