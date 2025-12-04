@@ -90,7 +90,7 @@ def calculate_mack_score_numba(x, v, nbrs_idx, t, eps=1e-5):
             # Pseudotime change
             d_t = t[i] - t[nbrs[j]] + eps # avoid division by zero
             
-            # calculate teh sign (should be 1, -1, or 0, I think d_x do not ahve nan)
+            # calculate teh sign 
             sign = d_x / d_t
             if sign > 0:
                 sign = 1
@@ -121,7 +121,7 @@ def compute_all_mack_scores(X_data, V_data, nbrs_idx, t, eps=1e-5):
     n_cells, n_genes = X_data.shape
     out = np.zeros(n_genes)
 
-    for gene_i in prange(n_genes):     # <--- parallel across genes!
+    for gene_i in prange(n_genes):     # parallel
         x = X_data[:, gene_i]
         v = V_data[:, gene_i]
         n = x.shape[0]
@@ -242,8 +242,8 @@ def gv_mack_score(
     return_score: bool = False,
 ) -> pd.DataFrame | None:
     
-    
-         # Determine the number of jobs to use.
+    # some basic checks from oiginal graphvelo
+    # Determine the number of jobs to use.
     if (n_jobs is None or not isinstance(n_jobs, int) or n_jobs < 0 or
             n_jobs > os.cpu_count()):
         n_jobs = os.cpu_count()
@@ -291,6 +291,7 @@ def gv_mack_score(
 
     t = t_data.flatten()
 
+    # Compute MACK scores
     scores = compute_all_mack_scores(X_data, V_data, nbrs_idx, t)
 
     rows = []
