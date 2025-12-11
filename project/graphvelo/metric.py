@@ -1,5 +1,7 @@
 import numpy as np
 import tqdm
+import scipy.sparse as sp
+
 def cross_boundary_correctness_one_transition(adata, transition, V_data,annotation_key = "celltype", reduce_space_key = "umap", neighbor_key = "neighbors"):
     set_A = np.where(adata.obs[annotation_key] == transition[0])[0]
     set_B = np.where(adata.obs[annotation_key] == transition[1])[0]
@@ -14,9 +16,17 @@ def cross_boundary_correctness_one_transition(adata, transition, V_data,annotati
         if len(intersect) == 0:
             continue   
 
+        space = None
+        if reduce_space_key is None:
+            space = adata.X.A if sp.issparse(adata.X) else adata.X
+
+        else:
+            space = adata.obsm[reduce_space_key]
+
+
         sum_cos_sim = 0.0
         for j in intersect:
-            x_ji = adata.obsm[reduce_space_key][j] - adata.obsm[reduce_space_key][i]
+            x_ji = space[j] - space[i]
             v_i = V_data[i]
             cos_sim = cosine_similarity(x_ji, v_i)
             sum_cos_sim += cos_sim
